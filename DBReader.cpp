@@ -253,10 +253,6 @@ void DBReader<T>::readIndex(std::string indexFileName, Index *index, char *data)
     indexFile.close();
 }
 
-//template<>
-//void DBReader<std::string>::readIndexId(std::string* id, char* line, char* save) {
-//    *id = strtok_r(line, "\t", &save);
-//}
 template<>
 void DBReader<int32_t>::readIndexId(int32_t *id, char *line, char **save) {
     *id = strtoull(strtok_r(line, "\t", save), NULL, 10);
@@ -288,9 +284,6 @@ void DBReader<int32_t>::sortIndex() {
 
 template
 class DBReader<int32_t>;
-//
-//template
-//class DBReader<std::string>;
 
 template
 class DBReader<char[32]>;
