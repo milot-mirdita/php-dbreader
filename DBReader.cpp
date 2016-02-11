@@ -75,6 +75,7 @@ void DBReader<T>::__construct(Php::Parameters &params) {
 
     if (fileExists(cacheFileName.c_str())) {
         loadCache(cacheFileName);
+        loadedFromCache = true;
         return;
     }
 
@@ -87,6 +88,8 @@ void DBReader<T>::__construct(Php::Parameters &params) {
     sortIndex();
 
     saveCache(cacheFileName);
+
+    loadedFromCache = false;
 }
 
 template<typename T>
@@ -95,19 +98,20 @@ void DBReader<T>::__destruct() {
         munmap(data, dataSize);
         fclose(dataFile);
     }
-    delete[] index;
+
+    if(loadedFromCache) {
+        munmap(index, size);
+    } else {
+        delete[] index;
+    }
 }
 
 template<typename T>
 void DBReader<T>::loadCache(std::string fileName) {
     FILE *file = fopen(fileName.c_str(), "rb");
     if (file != NULL) {
-        fread(&size, sizeof(size_t), 1, file);
-        index = new Index[size];
-        fread(index, sizeof(Index), size, file);
-        for (size_t i = 0; i < size; i++) {
-            index[i].data = (char *) (((size_t) index[i].data + (size_t) data));
-        }
+        index = (Index*) mmapData(file, &size, true);
+        size /= sizeof(Index);
         fclose(file);
     } else {
         throw Php::Exception("Could not load index cache");
@@ -118,12 +122,11 @@ template<typename T>
 void DBReader<T>::saveCache(std::string fileName) {
     FILE *file = fopen(fileName.c_str(), "w+b");
     if (file != NULL) {
-        fwrite(&size, sizeof(size_t), 1, file);
         Index *tmp = new Index[size];
         for (size_t i = 0; i < size; i++) {
             assignVal(&tmp[i].id, &index[i].id);
             tmp[i].length = index[i].length;
-            tmp[i].data = (char *) (((size_t) index[i].data - (size_t) data));
+            tmp[i].offset = index[i].offset;
         }
         fwrite(tmp, sizeof(Index), size, file);
         delete[] tmp;
@@ -190,11 +193,11 @@ Php::Value DBReader<T>::getData(Php::Parameters &params) {
         throw Php::Exception("Invalid database read");
     }
 
-    if ((size_t)(index[id].data - data) >= dataSize) {
+    if ((size_t)(index[id].offset) >= dataSize) {
         throw Php::Exception("Invalid database read");
     }
 
-    return index[id].data;
+    return (char*)((size_t)index[id].offset + (size_t)data);
 }
 
 template<typename T>
@@ -216,7 +219,7 @@ Php::Value DBReader<T>::getOffset(Php::Parameters &params) {
         throw Php::Exception("Invalid database read");
     }
 
-    return (int64_t)(index[id].data - data);
+    return static_cast<int64_t>(index[id].offset);
 }
 
 template<typename T>
@@ -242,9 +245,9 @@ void DBReader<T>::readIndex(std::string indexFileName, Index *index, char *data)
         index[i].length = length;
 
         if (dataMode & USE_DATA) {
-            index[i].data = data + offset;
+            index[i].offset = offset;
         } else {
-            index[i].data = NULL;
+            index[i].offset = 0;
         }
 
         i++;
@@ -277,7 +280,7 @@ void DBReader<int32_t>::sortIndex() {
     for (size_t i = 0; i < size; ++i) {
         index[i].id = sortArray[i].id;
         index[i].length = sortArray[i].length;
-        index[i].data = sortArray[i].data;
+        index[i].offset = sortArray[i].offset;
     }
     delete[] sortArray;
 }

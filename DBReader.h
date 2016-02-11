@@ -57,12 +57,13 @@ private:
     struct Index {
         T id;
         size_t length;
-        char *data;
+        size_t offset;
     };
 
     // number of entries in the index
     size_t size;
     Index *index;
+    bool loadedFromCache;
 
     static bool compareById(Index x, Index y) {
         return (x.id <= y.id);
