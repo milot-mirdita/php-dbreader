@@ -26,7 +26,7 @@ size_t countLines(std::string name) {
     std::vector<char> buffer(1024 * 1024);
     index.read(buffer.data(), buffer.size());
     while (size_t r = index.gcount()) {
-        for (int i = 0; i < r; i++) {
+        for (size_t i = 0; i < r; i++) {
             const char *p = buffer.data();
             if (p[i] == '\n') {
                 cnt++;
