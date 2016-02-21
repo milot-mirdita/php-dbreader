@@ -2,19 +2,16 @@
 
 #include <sstream>
 #include <fstream>
-#include <algorithm>
-#include <climits>
-#include <cstring>
 
 #include <sys/mman.h>
 #include <sys/stat.h>
 
-bool fileExists(const char *name) {
+bool fileExists(const std::string& name) {
     struct stat st;
-    return stat(name, &st) == 0;
+    return stat(name.c_str(), &st) == 0;
 }
 
-size_t countLines(std::string name) {
+size_t countLines(const std::string& name) {
     std::ifstream index(name);
     if (index.fail()) {
         std::ostringstream message;
@@ -59,12 +56,6 @@ void DBReader<T>::__construct(Php::Parameters &params) {
     indexFileName = (const char *) params[1];
     dataMode = (int32_t) params[2];
 
-    cacheFileName = indexFileName;
-    cacheFileName.append(".cache.");
-    cacheFileName.append(std::to_string(dataMode));
-    cacheFileName.append(".");
-    cacheFileName.append(typeid(T).name());
-
     if (dataMode & USE_DATA) {
         dataFile = fopen(dataFileName.c_str(), "r");
         if (dataFile == NULL) {
@@ -76,22 +67,24 @@ void DBReader<T>::__construct(Php::Parameters &params) {
         data = mmapData(dataFile, &dataSize, writable);
     }
 
-    if (fileExists(cacheFileName.c_str())) {
+    std::string cacheFileName = indexFileName;
+    cacheFileName.append(".cache.");
+    cacheFileName.append(std::to_string(dataMode));
+    cacheFileName.append(".");
+    cacheFileName.append(typeid(T).name());
+
+    if (fileExists(cacheFileName)) {
         loadCache(cacheFileName);
         loadedFromCache = true;
         return;
     }
 
     size = countLines(indexFileName);
-
     index = new Index[size];
-
-    readIndex(indexFileName, index);
-
+    readIndex();
     sortIndex();
 
     saveCache(cacheFileName);
-
     loadedFromCache = false;
 }
 
@@ -102,7 +95,7 @@ void DBReader<T>::__destruct() {
         fclose(dataFile);
     }
 
-    if(loadedFromCache) {
+    if (loadedFromCache) {
         munmap(index, static_cast<size_t>(size));
     } else {
         delete[] index;
@@ -113,7 +106,7 @@ template<typename T>
 void DBReader<T>::loadCache(std::string fileName) {
     FILE *file = fopen(fileName.c_str(), "rb");
     if (file != NULL) {
-        index = (Index*) mmapData(file, &size, true);
+        index = (Index *) mmapData(file, &size, true);
         size /= sizeof(Index);
         fclose(file);
     } else {
@@ -127,30 +120,13 @@ template<typename T>
 void DBReader<T>::saveCache(std::string fileName) {
     FILE *file = fopen(fileName.c_str(), "w+b");
     if (file != NULL) {
-        Index *tmp = new Index[size];
-        for (size_t i = 0; i < size; i++) {
-            assignVal(&tmp[i].id, &index[i].id);
-            tmp[i].length = index[i].length;
-            tmp[i].offset = index[i].offset;
-        }
-        fwrite(tmp, sizeof(Index), static_cast<size_t>(size), file);
-        delete[] tmp;
+        fwrite(index, sizeof(Index), static_cast<size_t>(size), file);
         fclose(file);
     } else {
         std::ostringstream message;
         message << "Could not save index cache to " << fileName;
         throw Php::Exception(message.str());
     }
-}
-
-template<typename T>
-void DBReader<T>::assignVal(T *id1, T *id2) {
-    *id1 = *id2;
-}
-
-template<>
-void DBReader<char[32]>::assignVal(char (*id1)[32], char (*id2)[32]) {
-    memcpy(id1, id2, 32);
 }
 
 template<typename T>
@@ -161,7 +137,13 @@ Php::Value DBReader<T>::getId(Php::Parameters &params) {
     val.id = dbKey;
     size_t id = std::upper_bound(index, index + size, val, compareById) - index;
 
-    return (int64_t)((index[id].id == dbKey) ? id : UINT_MAX);
+    if (index[id].id == dbKey) {
+        return (int64_t) id;
+    } else {
+        std::ostringstream message;
+        message << "Key " << id << " not found in index";
+        throw Php::Exception(message.str());
+    }
 }
 
 template<>
@@ -170,17 +152,23 @@ Php::Value DBReader<char[32]>::getId(Php::Parameters &params) {
     memcpy(&val.id, static_cast<const char *>(params[0]), 32);
 
     size_t id = std::upper_bound(index, index + size, val,
-                                 [](Index x, Index y) {
+                                 [](const Index &x, const Index &y) {
                                      return strcmp(x.id, y.id) <= 0;
                                  }) - index;
 
-    return (int64_t)((strcmp(index[id].id, val.id) == 0) ? id : UINT_MAX);
+    if (strcmp(index[id].id, val.id) == 0) {
+        return (int64_t) id;
+    } else {
+        std::ostringstream message;
+        message << "Key " << id << " not found in index";
+        throw Php::Exception(message.str());
+    }
 }
 
 void checkBounds(size_t id, size_t size) {
     if (id >= size) {
         std::ostringstream message;
-        message << "Read index " << id << " out of bounds";
+        message << "Index " << id << " out of bounds";
         throw Php::Exception(message.str());
     }
 }
@@ -204,11 +192,11 @@ Php::Value DBReader<T>::getData(Php::Parameters &params) {
 
     checkBounds(id, static_cast<size_t>(size));
 
-    if ((size_t)(index[id].offset) >= dataSize) {
+    if ((size_t) (index[id].offset) >= dataSize) {
         throw Php::Exception("Invalid database read");
     }
 
-    return (char*)((size_t)index[id].offset + (size_t)data);
+    return (char *) ((size_t) index[id].offset + (size_t) data);
 }
 
 template<typename T>
@@ -230,7 +218,21 @@ Php::Value DBReader<T>::getOffset(Php::Parameters &params) {
 }
 
 template<typename T>
-void DBReader<T>::readIndex(std::string indexFileName, Index *index) {
+void readIndexId(T *, char *, char **) { }
+
+template<>
+void readIndexId(int32_t *id, char *line, char **save) {
+    *id = static_cast<int32_t>(strtol(strtok_r(line, "\t", save), NULL, 10));
+}
+
+template<>
+void readIndexId(char (*id)[32], char *line, char **save) {
+    const char *identifier = strtok_r(line, "\t", save);
+    memcpy(id, identifier, 32);
+}
+
+template<typename T>
+void DBReader<T>::readIndex() {
     std::ifstream indexFile(indexFileName);
 
     if (indexFile.fail()) {
@@ -244,7 +246,7 @@ void DBReader<T>::readIndex(std::string indexFileName, Index *index) {
     std::string line;
     while (std::getline(indexFile, line)) {
         char *l = (char *) line.c_str();
-        readIndexId(&index[i].id, l, &save);
+        readIndexId<T>(&index[i].id, l, &save);
         size_t offset = strtoull(strtok_r(NULL, "\t", &save), NULL, 10);
         size_t length = strtoull(strtok_r(NULL, "\t", &save), NULL, 10);
         if (i >= size) {
@@ -267,33 +269,12 @@ void DBReader<T>::readIndex(std::string indexFileName, Index *index) {
     indexFile.close();
 }
 
-template<>
-void DBReader<int32_t>::readIndexId(int32_t *id, char *line, char **save) {
-    *id = strtoull(strtok_r(line, "\t", save), NULL, 10);
-}
-
-template<>
-void DBReader<char[32]>::readIndexId(char (*id)[32], char *line, char **save) {
-    const char *identifier = strtok_r(line, "\t", save);
-    memcpy(id, identifier, 32);
-}
-
 template<typename T>
 void DBReader<T>::sortIndex() { }
 
 template<>
 void DBReader<int32_t>::sortIndex() {
-    Index *sortArray = new Index[size];
-    for (size_t i = 0; i < size; i++) {
-        sortArray[i] = index[i];
-    }
-    std::sort(sortArray, sortArray + size, compareIndexLengthPairById());
-    for (size_t i = 0; i < size; ++i) {
-        index[i].id = sortArray[i].id;
-        index[i].length = sortArray[i].length;
-        index[i].offset = sortArray[i].offset;
-    }
-    delete[] sortArray;
+    std::sort(index, index + size, compareIndexLengthPairById());
 }
 
 template

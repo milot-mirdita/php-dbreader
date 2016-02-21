@@ -32,7 +32,6 @@ public:
     }
 
     // does a binary search in the ffindex and returns index of the entry with dbKey
-    // returns UINT_MAX if the key is not contained in index
     Php::Value getId(Php::Parameters &params);
 
     Php::Value getData(Php::Parameters &params);
@@ -47,7 +46,6 @@ public:
 private:
     std::string dataFileName;
     std::string indexFileName;
-    std::string cacheFileName;
     int dataMode;
 
     // size of all data stored in ffindex
@@ -66,17 +64,12 @@ private:
     Index *index;
     bool loadedFromCache;
 
-    static bool compareById(Index x, Index y) {
+    static bool compareById(const Index &x, const Index &y) {
         return (x.id <= y.id);
     }
 
-    void readIndexId(T* id, char* line, char** save);
-
-    void assignVal(T* id1, T* id2);
-    void readIndex(std::string indexFileName, Index *index);
-
-    void loadCache(std::string fileName);
-    void saveCache(std::string fileName);
+    void readIndex();
+    void sortIndex();
 
     struct compareIndexLengthPairById {
         bool operator()(const Index &lhs, const Index &rhs) const {
@@ -84,7 +77,8 @@ private:
         }
     };
 
-    void sortIndex();
+    void loadCache(std::string fileName);
+    void saveCache(std::string fileName);
 };
 
 #endif
