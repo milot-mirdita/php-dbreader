@@ -30,7 +30,6 @@ extern "C" {
         intDB.method("getOffset", &DBReader<int32_t>::getOffset);
         intDB.method("getId", &DBReader<int32_t>::getId);
 
-        intDB.property("USE_INDEX", "0", Php::Public | Php::Static);
         intDB.property("USE_DATA", "1", Php::Public | Php::Static);
         intDB.property("USE_WRITABLE", "2", Php::Public | Php::Static);
 
@@ -47,7 +46,6 @@ extern "C" {
         stringDB.method("getOffset", &DBReader<char[32]>::getOffset);
         stringDB.method("getId", &DBReader<char[32]>::getId);
 
-        stringDB.property("USE_INDEX", "0", Php::Public | Php::Static);
         stringDB.property("USE_DATA", "1", Php::Public | Php::Static);
         stringDB.property("USE_WRITABLE", "2", Php::Public | Php::Static);
 

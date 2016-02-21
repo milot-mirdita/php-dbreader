@@ -1,15 +1,13 @@
 #include "DBReader.h"
 
+#include <sstream>
 #include <fstream>
 #include <algorithm>
 #include <climits>
 #include <cstring>
-#include <cstdio>
 
 #include <sys/mman.h>
 #include <sys/stat.h>
-
-#include <typeinfo>
 
 bool fileExists(const char *name) {
     struct stat st;
@@ -19,13 +17,15 @@ bool fileExists(const char *name) {
 size_t countLines(std::string name) {
     std::ifstream index(name);
     if (index.fail()) {
-        throw Php::Exception("Could not open index file");
+        std::ostringstream message;
+        message << "Could not open file " << name;
+        throw Php::Exception(message.str());
     }
 
     size_t cnt = 0;
     std::vector<char> buffer(1024 * 1024);
     index.read(buffer.data(), buffer.size());
-    while (size_t r = index.gcount()) {
+    while (ptrdiff_t r = index.gcount()) {
         for (size_t i = 0; i < r; i++) {
             const char *p = buffer.data();
             if (p[i] == '\n') {
@@ -39,7 +39,7 @@ size_t countLines(std::string name) {
     return cnt;
 }
 
-char *mmapData(FILE *file, size_t *dataSize, bool writable) {
+char *mmapData(FILE *file, ssize_t *dataSize, bool writable) {
     struct stat sb;
     fstat(fileno(file), &sb);
     *dataSize = sb.st_size;
@@ -49,7 +49,7 @@ char *mmapData(FILE *file, size_t *dataSize, bool writable) {
     if (writable) {
         mode |= PROT_WRITE;
     }
-    return (char *) mmap(NULL, *dataSize, mode, MAP_PRIVATE, fd, 0);
+    return static_cast<char *>(mmap(NULL, static_cast<size_t>(*dataSize), mode, MAP_PRIVATE, fd, 0));
 }
 
 
@@ -68,9 +68,12 @@ void DBReader<T>::__construct(Php::Parameters &params) {
     if (dataMode & USE_DATA) {
         dataFile = fopen(dataFileName.c_str(), "r");
         if (dataFile == NULL) {
-            throw Php::Exception("Could not open database");
+            std::ostringstream message;
+            message << "Could not open data file " << dataFileName;
+            throw Php::Exception(message.str());
         }
-        data = mmapData(dataFile, &dataSize, dataMode & USE_WRITABLE);
+        bool writable = static_cast<bool>(dataMode & USE_WRITABLE);
+        data = mmapData(dataFile, &dataSize, writable);
     }
 
     if (fileExists(cacheFileName.c_str())) {
@@ -83,7 +86,7 @@ void DBReader<T>::__construct(Php::Parameters &params) {
 
     index = new Index[size];
 
-    readIndex(indexFileName, index, data);
+    readIndex(indexFileName, index);
 
     sortIndex();
 
@@ -95,12 +98,12 @@ void DBReader<T>::__construct(Php::Parameters &params) {
 template<typename T>
 void DBReader<T>::__destruct() {
     if (dataMode & USE_DATA) {
-        munmap(data, dataSize);
+        munmap(data, static_cast<size_t>(dataSize));
         fclose(dataFile);
     }
 
     if(loadedFromCache) {
-        munmap(index, size);
+        munmap(index, static_cast<size_t>(size));
     } else {
         delete[] index;
     }
@@ -114,7 +117,9 @@ void DBReader<T>::loadCache(std::string fileName) {
         size /= sizeof(Index);
         fclose(file);
     } else {
-        throw Php::Exception("Could not load index cache");
+        std::ostringstream message;
+        message << "Could not load index cache from " << fileName;
+        throw Php::Exception(message.str());
     }
 }
 
@@ -128,11 +133,13 @@ void DBReader<T>::saveCache(std::string fileName) {
             tmp[i].length = index[i].length;
             tmp[i].offset = index[i].offset;
         }
-        fwrite(tmp, sizeof(Index), size, file);
+        fwrite(tmp, sizeof(Index), static_cast<size_t>(size), file);
         delete[] tmp;
         fclose(file);
     } else {
-        throw Php::Exception("Could not save index cache");
+        std::ostringstream message;
+        message << "Could not save index cache to " << fileName;
+        throw Php::Exception(message.str());
     }
 }
 
@@ -170,28 +177,32 @@ Php::Value DBReader<char[32]>::getId(Php::Parameters &params) {
     return (int64_t)((strcmp(index[id].id, val.id) == 0) ? id : UINT_MAX);
 }
 
+void checkBounds(size_t id, size_t size) {
+    if (id >= size) {
+        std::ostringstream message;
+        message << "Read index " << id << " out of bounds";
+        throw Php::Exception(message.str());
+    }
+}
+
 template<typename T>
 Php::Value DBReader<T>::getDbKey(Php::Parameters &params) {
-    size_t id = (int64_t) params[0];
+    size_t id = static_cast<size_t>((int64_t) params[0]);
 
-    if (id >= size) {
-        throw Php::Exception("Invalid database read");
-    }
+    checkBounds(id, static_cast<size_t>(size));
 
     return index[id].id;
 }
 
 template<typename T>
 Php::Value DBReader<T>::getData(Php::Parameters &params) {
-    size_t id = (int64_t) params[0];
+    size_t id = static_cast<size_t>((int64_t) params[0]);
 
     if (!(dataMode & USE_DATA)) {
-        throw Php::Exception("DBReader is just open in INDEXONLY mode");
+        throw Php::Exception("DBReader is not open in USE_DATA mode");
     }
 
-    if (id >= size) {
-        throw Php::Exception("Invalid database read");
-    }
+    checkBounds(id, static_cast<size_t>(size));
 
     if ((size_t)(index[id].offset) >= dataSize) {
         throw Php::Exception("Invalid database read");
@@ -202,32 +213,30 @@ Php::Value DBReader<T>::getData(Php::Parameters &params) {
 
 template<typename T>
 Php::Value DBReader<T>::getLength(Php::Parameters &params) {
-    size_t id = (int64_t) params[0];
+    size_t id = static_cast<size_t>((int64_t) params[0]);
 
-    if (id >= size) {
-        throw Php::Exception("Invalid database read");
-    }
+    checkBounds(id, static_cast<size_t>(size));
 
     return (int64_t) index[id].length;
 }
 
 template<typename T>
 Php::Value DBReader<T>::getOffset(Php::Parameters &params) {
-    size_t id = (int64_t) params[0];
+    size_t id = static_cast<size_t>((int64_t) params[0]);
 
-    if (id >= size) {
-        throw Php::Exception("Invalid database read");
-    }
+    checkBounds(id, static_cast<size_t>(size));
 
     return static_cast<int64_t>(index[id].offset);
 }
 
 template<typename T>
-void DBReader<T>::readIndex(std::string indexFileName, Index *index, char *data) {
+void DBReader<T>::readIndex(std::string indexFileName, Index *index) {
     std::ifstream indexFile(indexFileName);
 
     if (indexFile.fail()) {
-        throw Php::Exception("Could not open index file");
+        std::ostringstream message;
+        message << "Could not open index file " << indexFileName;
+        throw Php::Exception(message.str());
     }
 
     char *save;
@@ -239,7 +248,9 @@ void DBReader<T>::readIndex(std::string indexFileName, Index *index, char *data)
         size_t offset = strtoull(strtok_r(NULL, "\t", &save), NULL, 10);
         size_t length = strtoull(strtok_r(NULL, "\t", &save), NULL, 10);
         if (i >= size) {
-            throw Php::Exception("Corrupted Memory");
+            std::ostringstream message;
+            message << "Could not read index entry in line " << i;
+            throw Php::Exception(message.str());
         }
 
         index[i].length = length;

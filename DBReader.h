@@ -1,9 +1,11 @@
 #ifndef DBREADER_H
 #define DBREADER_H
 
-// Written by Martin Steinegger & Maria Hauser mhauser@genzentrum.lmu.de
-//
-// Manages DB read access.
+// php_dbreader Written by Milot Mirdita milot@mirdita.de
+// php_dbreader is a low latency version of the mmseqs db access library
+// Original Implementation from MMseqs
+// Written by Martin Steinegger
+// & Maria Hauser mhauser@genzentrum.lmu.de
 //
 
 #include <cstddef>
@@ -14,7 +16,6 @@
 template<typename T>
 class DBReader : public Php::Base {
 public:
-    static const int USE_INDEX = 0;
     static const int USE_DATA = 1;
     static const int USE_WRITABLE = 2;
 
@@ -50,7 +51,7 @@ private:
     int dataMode;
 
     // size of all data stored in ffindex
-    size_t dataSize;
+    ssize_t dataSize;
     char *data;
     FILE *dataFile;
 
@@ -61,7 +62,7 @@ private:
     };
 
     // number of entries in the index
-    size_t size;
+    ssize_t size;
     Index *index;
     bool loadedFromCache;
 
@@ -69,13 +70,10 @@ private:
         return (x.id <= y.id);
     }
 
-    size_t bsearch(const Index *index, size_t size, T value);
-
-    void readIndex(std::string indexFileName, Index *index, char *data);
-
     void readIndexId(T* id, char* line, char** save);
 
     void assignVal(T* id1, T* id2);
+    void readIndex(std::string indexFileName, Index *index);
 
     void loadCache(std::string fileName);
     void saveCache(std::string fileName);
