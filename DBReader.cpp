@@ -137,7 +137,7 @@ Php::Value DBReader<T>::getId(Php::Parameters &params) {
     val.id = dbKey;
     size_t id = std::upper_bound(index, index + size, val, compareById) - index;
 
-    if (index[id].id == dbKey) {
+    if (id < size && index[id].id == dbKey) {
         return (int64_t) id;
     } else {
         std::ostringstream message;
@@ -156,7 +156,7 @@ Php::Value DBReader<char[32]>::getId(Php::Parameters &params) {
                                      return strcmp(x.id, y.id) <= 0;
                                  }) - index;
 
-    if (strcmp(index[id].id, val.id) == 0) {
+    if (id < size && strcmp(index[id].id, val.id) == 0) {
         return (int64_t) id;
     } else {
         std::ostringstream message;
