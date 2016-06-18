@@ -209,11 +209,11 @@ Php::Value DBReader<T>::getData(Php::Parameters &params) {
         throw Php::Exception("Not enough parameters");
     }
 
-    size_t id = static_cast<size_t>((int64_t) params[0]);
-
     if (!(dataMode & USE_DATA)) {
         throw Php::Exception("DBReader is not open in USE_DATA mode");
     }
+
+    size_t id = static_cast<size_t>((int64_t) params[0]);
 
     checkBounds(id, static_cast<size_t>(size));
 
