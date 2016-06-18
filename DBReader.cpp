@@ -221,7 +221,8 @@ Php::Value DBReader<T>::getData(Php::Parameters &params) {
         throw Php::Exception("Invalid database read");
     }
 
-    return (char *) ((size_t) index[id].offset + (size_t) data);
+    const char* dataPos = (data + index[id].offset);
+    return Php::Value(dataPos, static_cast<int>(index[id].length));
 }
 
 template<typename T>
