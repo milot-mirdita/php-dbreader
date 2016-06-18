@@ -2,6 +2,7 @@
 
 #include <sstream>
 #include <fstream>
+#include <algorithm>
 
 #include <sys/mman.h>
 #include <sys/stat.h>
