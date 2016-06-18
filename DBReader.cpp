@@ -52,9 +52,18 @@ char *mmapData(FILE *file, ssize_t *dataSize, bool writable) {
 
 template<typename T>
 void DBReader<T>::__construct(Php::Parameters &params) {
+    if (params.size() < 2) {
+        throw Php::Exception("Not enough parameters");
+    }
+
     dataFileName = (const char *) params[0];
     indexFileName = (const char *) params[1];
-    dataMode = (int32_t) params[2];
+
+    if (params.size() == 2) {
+        dataMode = USE_DATA;
+    } else {
+        dataMode = (int32_t) params[2];
+    }
 
     if (dataMode & USE_DATA) {
         dataFile = fopen(dataFileName.c_str(), "r");
@@ -131,6 +140,10 @@ void DBReader<T>::saveCache(std::string fileName) {
 
 template<typename T>
 Php::Value DBReader<T>::getId(Php::Parameters &params) {
+    if (params.size() < 1) {
+        throw Php::Exception("Not enough parameters");
+    }
+
     T dbKey = params[0];
 
     Index val;
@@ -148,6 +161,10 @@ Php::Value DBReader<T>::getId(Php::Parameters &params) {
 
 template<>
 Php::Value DBReader<char[32]>::getId(Php::Parameters &params) {
+    if (params.size() < 1) {
+        throw Php::Exception("Not enough parameters");
+    }
+
     Index val;
     memcpy(&val.id, static_cast<const char *>(params[0]), 32);
 
@@ -175,6 +192,10 @@ void checkBounds(size_t id, size_t size) {
 
 template<typename T>
 Php::Value DBReader<T>::getDbKey(Php::Parameters &params) {
+    if (params.size() < 1) {
+        throw Php::Exception("Not enough parameters");
+    }
+
     size_t id = static_cast<size_t>((int64_t) params[0]);
 
     checkBounds(id, static_cast<size_t>(size));
@@ -184,6 +205,10 @@ Php::Value DBReader<T>::getDbKey(Php::Parameters &params) {
 
 template<typename T>
 Php::Value DBReader<T>::getData(Php::Parameters &params) {
+    if (params.size() < 1) {
+        throw Php::Exception("Not enough parameters");
+    }
+
     size_t id = static_cast<size_t>((int64_t) params[0]);
 
     if (!(dataMode & USE_DATA)) {
@@ -201,6 +226,10 @@ Php::Value DBReader<T>::getData(Php::Parameters &params) {
 
 template<typename T>
 Php::Value DBReader<T>::getLength(Php::Parameters &params) {
+    if (params.size() < 1) {
+        throw Php::Exception("Not enough parameters");
+    }
+
     size_t id = static_cast<size_t>((int64_t) params[0]);
 
     checkBounds(id, static_cast<size_t>(size));
@@ -210,6 +239,10 @@ Php::Value DBReader<T>::getLength(Php::Parameters &params) {
 
 template<typename T>
 Php::Value DBReader<T>::getOffset(Php::Parameters &params) {
+    if (params.size() < 1) {
+        throw Php::Exception("Not enough parameters");
+    }
+
     size_t id = static_cast<size_t>((int64_t) params[0]);
 
     checkBounds(id, static_cast<size_t>(size));
