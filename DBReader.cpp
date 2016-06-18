@@ -307,7 +307,7 @@ void DBReader<T>::sortIndex() { }
 
 template<>
 void DBReader<int32_t>::sortIndex() {
-    std::sort(index, index + size, compareIndexLengthPairById());
+    std::stable_sort(index, index + size, compareIndexLengthPairById());
 }
 
 template
