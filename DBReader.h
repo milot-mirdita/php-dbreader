@@ -43,6 +43,12 @@ public:
     Php::Value getOffset(Php::Parameters &params);
 
 
+    struct Index {
+        T id;
+        size_t length;
+        size_t offset;
+    };
+
 private:
     std::string dataFileName;
     std::string indexFileName;
@@ -52,12 +58,6 @@ private:
     ssize_t dataSize;
     char *data;
     FILE *dataFile;
-
-    struct Index {
-        T id;
-        size_t length;
-        size_t offset;
-    };
 
     // number of entries in the index
     ssize_t size;
@@ -79,6 +79,8 @@ private:
 
     void loadCache(std::string fileName);
     void saveCache(std::string fileName);
+
+    friend class DBWriter;
 };
 
 #endif

@@ -1,5 +1,6 @@
 #include <phpcpp.h>
 #include "DBReader.h"
+#include "DBWriter.h"
 
 extern "C" {
     
@@ -12,7 +13,7 @@ extern "C" {
      */
     PHPCPP_EXPORT void *get_module() 
     {
-        static Php::Extension extension("dbreader", "0.1");
+        static Php::Extension extension("dbreader", "0.2");
 
         Php::Class<DBReader<int32_t>> intDB("IntDBReader");
         intDB.method("__construct", &DBReader<int32_t>::__construct);
@@ -45,6 +46,17 @@ extern "C" {
         stringDB.property("USE_WRITABLE", "2", Php::Public | Php::Static);
 
         extension.add(std::move(stringDB));
+
+        Php::Class<PhpDBWriter> intDBWriter("IntDBWriter");
+        intDBWriter.method("__construct", &PhpDBWriter::__construct);
+        intDBWriter.method("__destruct", &PhpDBWriter::__destruct);
+        intDBWriter.method("write", &PhpDBWriter::write);
+
+
+        intDBWriter.property("ASCII_MODE", "0", Php::Public | Php::Static);
+        intDBWriter.property("BINARY_MODE", "1", Php::Public | Php::Static);
+
+        extension.add(std::move(intDBWriter));
 
         return extension;
     }

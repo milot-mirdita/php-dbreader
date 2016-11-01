@@ -7,6 +7,9 @@ set(CMAKE_POSITION_INDEPENDENT_CODE TRUE)
 set(php_dbreader_source_files
         DBReader.h
         DBReader.cpp
+        itoa.h
+        DBWriter.h
+        DBWriter.cpp
         main.cpp)
 
 add_library(dbreader SHARED ${php_dbreader_source_files})
