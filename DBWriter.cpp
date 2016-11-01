@@ -3,6 +3,7 @@
 #include <sstream>
 #include <fstream>
 #include <sys/stat.h>
+#include <algorithm>
 
 #include "DBWriter.h"
 #include "itoa.h"
@@ -11,7 +12,7 @@ void errorIfFileExist(const std::string& file){
     struct stat st;
     if(stat(file.c_str(), &st) == 0) {
         std::ostringstream message;
-        message << sys_errlist[EEXIST];
+        message << strerror(EEXIST);
         throw Php::Exception(message.str());
     }
 }
@@ -38,13 +39,13 @@ DBWriter::DBWriter(const std::string& dataFileName,
 
     if (dataFile == NULL) {
         std::ostringstream message;
-        message << sys_errlist[errno];
+        message << strerror(errno);
         throw Php::Exception(message.str());
     }
 
     if (indexFile == NULL) {
         std::ostringstream message;
-        message << sys_errlist[errno];
+        message << strerror(errno);
         throw Php::Exception(message.str());
     }
 }
