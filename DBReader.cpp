@@ -223,7 +223,7 @@ Php::Value DBReader<T>::getData(Php::Parameters &params) {
     }
 
     const char* dataPos = (data + index[id].offset);
-    return Php::Value(dataPos, static_cast<int>(index[id].length));
+    return Php::Value(dataPos, static_cast<int>(index[id].length - 1));
 }
 
 template<typename T>
